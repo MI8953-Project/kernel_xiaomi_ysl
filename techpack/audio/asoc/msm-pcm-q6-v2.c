@@ -1413,20 +1413,11 @@ static int msm_pcm_volume_ctl_get(struct snd_kcontrol *kcontrol,
 		return 0;
 	}
 
-	pdata = (struct msm_plat_data *)
-			dev_get_drvdata(soc_prtd->platform->dev);
-	if (!pdata) {
-		pr_err("%s: pdata not found\n", __func__);
-		return -ENODEV;
-	}
-
-	mutex_lock(&pdata->lock);
 	if (substream->ref_count > 0) {
 		prtd = substream->runtime->private_data;
 		if (prtd)
 			ucontrol->value.integer.value[0] = prtd->volume;
 	}
-	mutex_unlock(&pdata->lock);
 	return 0;
 }
 
