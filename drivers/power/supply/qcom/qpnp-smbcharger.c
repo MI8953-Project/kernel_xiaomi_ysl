@@ -8426,13 +8426,7 @@ static int smbchg_probe(struct platform_device *pdev)
 	struct power_supply *typec_psy = NULL;
 	struct qpnp_vadc_chip *vadc_dev = NULL, *vchg_vadc_dev = NULL;
 	const char *typec_psy_name;
-
-	#ifdef THERMAL_CONFIG_FB
 	unsigned char attr_count2;
-	lct_therm_lvl_reserved = 0;
-	lct_therm_level = 0;
-	lct_backlight_off = false;
-	#endif
 
 	struct power_supply_config usb_psy_cfg = {};
 	struct power_supply_config batt_psy_cfg = {};
