@@ -354,6 +354,10 @@ config ARCH_ZYNQMP
 	help
 	  This enables support for Xilinx ZynqMP Family
 
+config YSL
+	bool "Based on Platform msm8953"
+	def_bool ARCH_MSM8953
+
 config MACH_XIAOMI_YSL
 	bool  "XIAOMI platform"
 	depends on ARCH_MSM8953
