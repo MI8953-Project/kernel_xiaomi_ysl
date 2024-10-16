@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2016, 2018-2019 The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2016, 2018-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -48,6 +48,7 @@
 #ifdef THERMAL_CONFIG_FB
 #include <linux/notifier.h>
 #include <linux/fb.h>
+
 int lct_therm_lvl_reserved;
 int lct_therm_level;
 bool lct_backlight_off;
@@ -125,13 +126,11 @@ struct smbchg_chip {
 	u8				revision[4];
 
 	/* configuration parameters */
-
-	int             cool_xiaomi;
+    int             cool_xiaomi;
 #ifdef THERMAL_CONFIG_FB
 	struct notifier_block notifier;
 	struct work_struct fb_notify_work;
 #endif
-
 	int				iterm_ma;
 	int				usb_max_current_ma;
 	int				typec_current_ma;
@@ -226,8 +225,8 @@ struct smbchg_chip {
 	bool				batt_hot;
 	bool				batt_cold;
 	bool				batt_warm;
-	bool				batt_cool_xiaomi;
 	bool				batt_cool;
+    bool				batt_cool_xiaomi;
 	unsigned int			thermal_levels;
 	unsigned int			therm_lvl_sel;
 	unsigned int			*thermal_mitigation;
@@ -278,7 +277,7 @@ struct smbchg_chip {
 	struct work_struct		usb_set_online_work;
 	struct delayed_work		vfloat_adjust_work;
 	struct delayed_work		hvdcp_det_work;
-	struct delayed_work		jeita_work;
+    struct delayed_work		jeita_work;
 	spinlock_t			sec_access_lock;
 	struct mutex			therm_lvl_lock;
 	struct mutex			usb_set_online_lock;
@@ -481,7 +480,6 @@ module_param_named(
 	int, 00600
 );
 
-/*set DCP current to 2A by wangyibo at 20181230*/
 static int smbchg_default_dcp_icl_ma = 2000;
 module_param_named(
 	default_dcp_icl_ma, smbchg_default_dcp_icl_ma,
@@ -1153,7 +1151,7 @@ static int get_prop_batt_voltage_now(struct smbchg_chip *chip)
 	return uv;
 }
 
-#define DEFAULT_BATT_VOLTAGE_MAX_DESIGN	4200000
+#define DEFAULT_BATT_VOLTAGE_MAX_DESIGN	4500000
 static int get_prop_batt_voltage_max_design(struct smbchg_chip *chip)
 {
 	int uv, rc;
@@ -1167,6 +1165,28 @@ static int get_prop_batt_voltage_max_design(struct smbchg_chip *chip)
 	return uv;
 }
 
+static int get_prop_batt_charge_counter(struct smbchg_chip *chip)
+{
+	int bcc = 0, rc;
+
+	rc = get_property_from_fg(chip,
+				POWER_SUPPLY_PROP_CHARGE_COUNTER, &bcc);
+	if (rc)
+		pr_smb(PR_STATUS, "Couldn't get charge_counter rc = %d\n", rc);
+	return bcc;
+}
+
+static int get_prop_batt_cycle_count(struct smbchg_chip *chip)
+{
+	int bcc = 0, rc;
+
+	rc = get_property_from_fg(chip,
+				POWER_SUPPLY_PROP_CYCLE_COUNT, &bcc);
+	if (rc)
+		pr_smb(PR_STATUS, "Couldn't get cycle_count rc = %d\n", rc);
+	return bcc;
+}
+
 static int get_prop_batt_health(struct smbchg_chip *chip)
 {
 	if (chip->batt_hot)
@@ -1175,7 +1195,7 @@ static int get_prop_batt_health(struct smbchg_chip *chip)
 		return POWER_SUPPLY_HEALTH_COLD;
 	else if (chip->batt_warm)
 		return POWER_SUPPLY_HEALTH_WARM;
-	else if (chip->batt_cool_xiaomi)
+    else if (chip->batt_cool_xiaomi)
 		return POWER_SUPPLY_HEALTH_COOL_XIAOMI;
 	else if (chip->batt_cool)
 		return POWER_SUPPLY_HEALTH_COOL;
@@ -2939,8 +2959,10 @@ static int smbchg_system_temp_level_set(struct smbchg_chip *chip,
 
 	#ifdef THERMAL_CONFIG_FB
 	pr_err("smblib_set_prop_system_temp_level val=%d\n", lvl_sel);
+
 	if (lvl_sel == chip->thermal_levels)
 		return 0;
+
 	if (LctThermal == 0) {
 		lct_therm_lvl_reserved = lvl_sel;
 	}
@@ -2949,7 +2971,7 @@ static int smbchg_system_temp_level_set(struct smbchg_chip *chip,
 	}
 	pr_err("LctThermal=%d, lct_backlight_off= %d, IsInCall=%d\n", LctThermal, lct_backlight_off, LctIsInCall);
 	#endif
-
+	
 	if (lvl_sel >= chip->thermal_levels) {
 		dev_err(chip->dev, "Unsupported level selected %d forcing %d\n",
 				lvl_sel, chip->thermal_levels - 1);
@@ -4511,7 +4533,7 @@ static int smbchg_set_optimal_charging_mode(struct smbchg_chip *chip, int type)
 	return 0;
 }
 
-#define DEFAULT_SDP_MA		100
+#define DEFAULT_SDP_MA		500
 #define DEFAULT_CDP_MA		1500
 static int smbchg_change_usb_supply_type(struct smbchg_chip *chip,
 						enum power_supply_type type)
@@ -4531,9 +4553,7 @@ static int smbchg_change_usb_supply_type(struct smbchg_chip *chip,
 	 * modes, skip all BC 1.2 current if external typec is supported.
 	 * Note: for SDP supporting current based on USB notifications.
 	 */
-	if (chip->typec_psy && (type != POWER_SUPPLY_TYPE_USB))
-		current_limit_ma = chip->typec_current_ma;
-	else if (type == POWER_SUPPLY_TYPE_USB)
+    if (type == POWER_SUPPLY_TYPE_USB)
 		current_limit_ma = DEFAULT_SDP_MA;
 	else if (type == POWER_SUPPLY_TYPE_USB_CDP)
 		current_limit_ma = DEFAULT_CDP_MA;
@@ -4664,25 +4684,32 @@ static void xiaomi_jeita_work(struct work_struct *work)
 	int temp;
 	union power_supply_propval prop = {0,};
 	temp = get_prop_batt_temp(chip);
+
 	if(temp > 0 && temp <= chip->cool_xiaomi && !chip->batt_cool_xiaomi){
 		chip->batt_cool_xiaomi = true;
 	}
 	else if(chip->batt_cool_xiaomi && (temp <= 0 || temp > chip->cool_xiaomi)){
 		chip->batt_cool_xiaomi = false;
 	}
+
+
     if(chip->batt_warm)
         vote(chip->fcc_votable, CUST_XIAOMI, true, 1500);
+
     else if(chip->batt_cool_xiaomi)
         vote(chip->fcc_votable, CUST_XIAOMI, true, 300);
+
     else if(chip->batt_cool)
         vote(chip->fcc_votable, CUST_XIAOMI, true, 900);
     else
         vote(chip->fcc_votable, CUST_XIAOMI, false, 0);
-	if(chip->bms_psy){
+
+    if(chip->bms_psy){
 		power_supply_get_property(chip->bms_psy, POWER_SUPPLY_PROP_BATTERY_TYPE, &prop);
 		if(strcmp(prop.strval, "unknown-battery") == 0)
 			vote(chip->fcc_votable, "BATTCHG_UNKNOWN", true, 500);
 	}
+	
 	schedule_delayed_work(&chip->jeita_work,
 			msecs_to_jiffies(JEITA_RESTART_DELAY_MS));
 	return;
@@ -4811,7 +4838,7 @@ static void handle_usb_removal(struct smbchg_chip *chip)
 	/* cancel/wait for hvdcp pending work if any */
 	cancel_delayed_work_sync(&chip->hvdcp_det_work);
 	smbchg_relax(chip, PM_DETECT_HVDCP);
-	smbchg_change_usb_supply_type(chip, POWER_SUPPLY_TYPE_UNKNOWN);
+	smbchg_change_usb_supply_type(chip, POWER_SUPPLY_TYPE_USB);
 	extcon_set_cable_state_(chip->extcon, EXTCON_USB, chip->usb_present);
 	smbchg_request_dpdm(chip, false);
 	schedule_work(&chip->usb_set_online_work);
@@ -5241,7 +5268,7 @@ static void smbchg_handle_hvdcp3_disable(struct smbchg_chip *chip)
 			schedule_delayed_work(&chip->hvdcp_det_work,
 				msecs_to_jiffies(HVDCP_NOTIFY_MS));
 	} else {
-		smbchg_change_usb_supply_type(chip, POWER_SUPPLY_TYPE_USB);
+		smbchg_change_usb_supply_type(chip, POWER_SUPPLY_TYPE_UNKNOWN);
 	}
 }
 
@@ -5298,8 +5325,6 @@ static int smbchg_prepare_for_pulsing(struct smbchg_chip *chip)
 		goto handle_removal;
 	}
 
-	set_usb_psy_dp_dm(chip, POWER_SUPPLY_DP_DM_DP0P6_DMF);
-
 	/* disable APSD */
 	pr_smb(PR_MISC, "Disabling APSD\n");
 	rc = smbchg_sec_masked_write(chip,
@@ -5323,6 +5348,7 @@ static int smbchg_prepare_for_pulsing(struct smbchg_chip *chip)
 	smbchg_sec_masked_write(chip, chip->usb_chgpth_base + USB_AICL_CFG,
 			AICL_EN_BIT, AICL_EN_BIT);
 
+	set_usb_psy_dp_dm(chip, POWER_SUPPLY_DP_DM_DP0P6_DMF);
 	/*
 	 * DCP will switch to HVDCP in this time by removing the short
 	 * between DP DM
@@ -5790,42 +5816,6 @@ static int smbchg_dp_dm(struct smbchg_chip *chip, int val)
 	return rc;
 }
 
-static int smbchg_get_prop_batt_charge_counter(struct smbchg_chip *chip)
-{
-	int rc;
-	union power_supply_propval val;
-
-	if (!chip->bms_psy)
-		return -EINVAL;
-
-	rc = power_supply_get_property(chip->bms_psy,
-				POWER_SUPPLY_PROP_CHARGE_COUNTER, &val);
-	if (rc < 0) {
-		pr_smb(PR_STATUS, "Couldn't get charge count rc = %d\n", rc);
-		return rc;
-	}
-
-	return val.intval;
-}
-
-static int smbchg_get_prop_batt_current_max(struct smbchg_chip *chip)
-{
-	int rc;
-	union power_supply_propval val;
-
-	if (!chip->usb_psy)
-		return -EINVAL;
-
-	rc = power_supply_get_property(chip->usb_psy,
-				POWER_SUPPLY_PROP_CURRENT_MAX, &val);
-	if (rc < 0) {
-		pr_smb(PR_STATUS, "Couldn't get current max rc = %d\n", rc);
-		return rc;
-	}
-
-	return val.intval;
-}
-
 static void update_typec_capability_status(struct smbchg_chip *chip,
 					const union power_supply_propval *val)
 {
@@ -6004,7 +5994,6 @@ static enum power_supply_property smbchg_battery_properties[] = {
 	POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX,
 	POWER_SUPPLY_PROP_VOLTAGE_MAX,
 	POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN,
-	POWER_SUPPLY_PROP_CURRENT_MAX,
 	POWER_SUPPLY_PROP_CURRENT_NOW,
 	POWER_SUPPLY_PROP_TEMP,
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
@@ -6017,7 +6006,6 @@ static enum power_supply_property smbchg_battery_properties[] = {
 	POWER_SUPPLY_PROP_FLASH_ACTIVE,
 	POWER_SUPPLY_PROP_FLASH_TRIGGER,
 	POWER_SUPPLY_PROP_DP_DM,
-	POWER_SUPPLY_PROP_CHARGE_COUNTER,
 	POWER_SUPPLY_PROP_INPUT_CURRENT_LIMITED,
 	POWER_SUPPLY_PROP_RERUN_AICL,
 	POWER_SUPPLY_PROP_RESTRICTED_CHARGING,
@@ -6028,7 +6016,6 @@ static enum power_supply_property smbchg_battery_properties[] = {
     POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
 };
 
-#define CHARGE_FULL_DESIGIN 3080
 static int smbchg_battery_set_property(struct power_supply *psy,
 				       enum power_supply_property prop,
 				       const union power_supply_propval *val)
@@ -6143,6 +6130,7 @@ static int smbchg_battery_is_writeable(struct power_supply *psy,
 	return rc;
 }
 
+#define CHARGE_FULL_DESIGIN 3080
 static int smbchg_battery_get_property(struct power_supply *psy,
 				       enum power_supply_property prop,
 				       union power_supply_propval *val)
@@ -6172,9 +6160,6 @@ static int smbchg_battery_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
 		val->intval = smbchg_float_voltage_get(chip);
-		break;
-	case POWER_SUPPLY_PROP_CURRENT_MAX:
-		val->intval = smbchg_get_prop_batt_current_max(chip);
 		break;
 	case POWER_SUPPLY_PROP_HEALTH:
 		val->intval = get_prop_batt_health(chip);
@@ -6206,7 +6191,6 @@ static int smbchg_battery_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
 		val->intval = get_prop_batt_current_now(chip);
-		val->intval *= (-1);
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
 		val->intval = get_prop_batt_voltage_now(chip);
@@ -6234,9 +6218,6 @@ static int smbchg_battery_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_DP_DM:
 		val->intval = chip->pulse_cnt;
-		break;
-	case POWER_SUPPLY_PROP_CHARGE_COUNTER:
-		val->intval = smbchg_get_prop_batt_charge_counter(chip);
 		break;
 	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMITED:
 		val->intval = smbchg_is_input_current_limited(chip);
@@ -6689,8 +6670,7 @@ static irqreturn_t usbin_uv_handler(int irq, void *_chip)
 	if (chip->hvdcp_3_det_ignore_uv)
 		goto out;
 
-	if ((reg & USBIN_UV_BIT) && (reg & USBIN_SRC_DET_BIT) &&
-		!chip->hvdcp_3_det_ignore_uv) {
+	if ((reg & USBIN_UV_BIT) && (reg & USBIN_SRC_DET_BIT)) {
 		pr_smb(PR_STATUS, "Very weak charger detected\n");
 		chip->very_weak_charger = true;
 		rc = smbchg_read(chip, &reg,
@@ -7017,11 +6997,9 @@ static inline int get_bpd(const char *name)
 #define INPUT_MISSING_POLLER_EN_BIT	BIT(3)
 #define CHGR_CCMP_CFG			0xFA
 #define JEITA_TEMP_HARD_LIMIT_BIT	BIT(5)
-/*off cool float voltage comp wangyibo at 20181230*/
 #define COLD_SL_CHG_I_COMP		BIT(0)
 #define HOT_SL_CHG_I_COMP		BIT(1)
 #define COLD_SL_FV_COMP_BIT		BIT(2)
-/*off cool float voltage comp wangyibo at 20181230*/
 #define HVDCP_ADAPTER_SEL_MASK		SMB_MASK(5, 4)
 #define HVDCP_ADAPTER_SEL_9V_BIT	BIT(4)
 #define HVDCP_AUTH_ALG_EN_BIT		BIT(6)
@@ -7513,6 +7491,7 @@ static int smbchg_hw_init(struct smbchg_chip *chip)
 				USBIN_5V_OV_SEL, 0);
 		if (rc < 0)
 			pr_err(" force set 5v adapter ovp is 6.3v  fail rc=%d\n", rc);
+
 	return rc;
 }
 
@@ -7656,7 +7635,7 @@ static int smb_parse_dt(struct smbchg_chip *chip)
 			"ibat-ocp-threshold-ua", rc, 1);
 	if (ocp_thresh >= 0)
 		smbchg_ibat_ocp_threshold_ua = ocp_thresh;
-	OF_PROP_READ(chip, chip->cool_xiaomi, "cool-xiaomi-bat-decidegc", rc, 1);
+    OF_PROP_READ(chip, chip->cool_xiaomi, "cool-xiaomi-bat-decidegc", rc, 1);
 	OF_PROP_READ(chip, chip->iterm_ma, "iterm-ma", rc, 1);
 	OF_PROP_READ(chip, chip->cfg_fastchg_current_ma,
 			"fastchg-current-ma", rc, 1);
@@ -8360,20 +8339,25 @@ static ssize_t lct_thermal_call_status_store(struct device *dev,
 {
 	int retval;
 	unsigned int input;
+
 	if (sscanf(buf, "%u", &input) != 1)
 		retval = -EINVAL;
 	else
 	        LctIsInCall = input;
+
 	pr_err("IsInCall = %d\n", LctIsInCall);
+
 	return retval;
 }
 static struct device_attribute attrs2[] = {
 	__ATTR(thermalcall, S_IRUGO | S_IWUSR,
 			lct_thermal_call_status_show, lct_thermal_call_status_store),
 };
+
 static void thermal_fb_notifier_resume_work(struct work_struct *work)
 {
 	struct smbchg_chip *chip = container_of(work, struct smbchg_chip, fb_notify_work);
+
 	LctThermal = 1;
 	if((lct_backlight_off) && (LctIsInCall == 0))
 		smbchg_system_temp_level_set(chip, lct_therm_level);
@@ -8383,6 +8367,7 @@ static void thermal_fb_notifier_resume_work(struct work_struct *work)
 		smbchg_system_temp_level_set(chip, lct_therm_lvl_reserved);
 	LctThermal = 0;
 }
+
 /* frame buffer notifier block control the suspend/resume procedure */
 static int thermal_notifier_callback(struct notifier_block *noti, unsigned long event, void *data)
 {
@@ -8392,6 +8377,7 @@ static int thermal_notifier_callback(struct notifier_block *noti, unsigned long 
 	if (ev_data && ev_data->data && chip) {
 		blank = ev_data->data;
 		if (event == FB_EARLY_EVENT_BLANK && *blank == FB_BLANK_UNBLANK) {
+
 			lct_backlight_off = false;
 			schedule_work(&chip->fb_notify_work);
 		}
@@ -8400,21 +8386,26 @@ static int thermal_notifier_callback(struct notifier_block *noti, unsigned long 
 			schedule_work(&chip->fb_notify_work);
 		}
 	}
+
 	return 0;
 }
+
 static int lct_register_powermanger(struct smbchg_chip *chip)
 {
 #if defined(CONFIG_FB)
 	chip->notifier.notifier_call = thermal_notifier_callback;
 	fb_register_client(&chip->notifier);
 #endif
+
 	return 0;
 }
+
 static int lct_unregister_powermanger(struct smbchg_chip *chip)
 {
 #if defined(CONFIG_FB)
 	fb_unregister_client(&chip->notifier);
 #endif
+
 	return 0;
 }
 #endif
@@ -8574,14 +8565,12 @@ static int smbchg_probe(struct platform_device *pdev)
 			smbchg_parallel_usb_en_work);
 	INIT_DELAYED_WORK(&chip->vfloat_adjust_work, smbchg_vfloat_adjust_work);
 	INIT_DELAYED_WORK(&chip->hvdcp_det_work, smbchg_hvdcp_det_work);
-
-	INIT_DELAYED_WORK(&chip->jeita_work, xiaomi_jeita_work);
+    INIT_DELAYED_WORK(&chip->jeita_work, xiaomi_jeita_work);
 	#ifdef THERMAL_CONFIG_FB
 	INIT_WORK(&chip->fb_notify_work, thermal_fb_notifier_resume_work);
 	/* register suspend and resume fucntion*/
 	lct_register_powermanger(chip);
 	#endif
-
 	init_completion(&chip->src_det_lowered);
 	init_completion(&chip->src_det_raised);
 	init_completion(&chip->usbin_uv_lowered);
@@ -8594,11 +8583,9 @@ static int smbchg_probe(struct platform_device *pdev)
 	chip->typec_psy = typec_psy;
 	chip->fake_battery_soc = -EINVAL;
 	chip->usb_online = -EINVAL;
-
-	chip->batt_cool_xiaomi = false;
+    chip->batt_cool_xiaomi = false;
 	chip->batt_warm = false;
 	chip->batt_cool = false;
-
 	dev_set_drvdata(&pdev->dev, chip);
 
 	spin_lock_init(&chip->sec_access_lock);
@@ -8773,10 +8760,8 @@ static int smbchg_probe(struct platform_device *pdev)
 	update_usb_status(chip, is_usb_present(chip), false);
 	dump_regs(chip);
 	create_debugfs_entries(chip);
-
-	schedule_delayed_work(&chip->jeita_work,
+    schedule_delayed_work(&chip->jeita_work,
 			msecs_to_jiffies(JEITA_RESTART_DELAY_MS));
-
 	dev_info(chip->dev,
 		"SMBCHG successfully probe Charger version=%s Revision DIG:%d.%d ANA:%d.%d batt=%d dc=%d usb=%d\n",
 			version_str[chip->schg_version],
@@ -8819,15 +8804,6 @@ static int smbchg_remove(struct platform_device *pdev)
 {
 	struct smbchg_chip *chip = dev_get_drvdata(&pdev->dev);
 
-	#ifdef THERMAL_CONFIG_FB
-	unsigned char attr_count2;
-	for (attr_count2 = 0; attr_count2 < ARRAY_SIZE(attrs2); attr_count2++) {
-		sysfs_remove_file(&chip->dev->kobj,
-						&attrs2[attr_count2].attr);
-	}
-	lct_unregister_powermanger(chip);
-	#endif
-
 	debugfs_remove_recursive(chip->debug_root);
 
 	destroy_votable(chip->aicl_deglitch_short_votable);
@@ -8847,6 +8823,15 @@ static void smbchg_shutdown(struct platform_device *pdev)
 {
 	struct smbchg_chip *chip = dev_get_drvdata(&pdev->dev);
 	int rc;
+
+    #ifdef THERMAL_CONFIG_FB
+	unsigned char attr_count2;
+	for (attr_count2 = 0; attr_count2 < ARRAY_SIZE(attrs2); attr_count2++) {
+		sysfs_remove_file(&chip->dev->kobj,
+						&attrs2[attr_count2].attr);
+	}
+	lct_unregister_powermanger(chip);
+	#endif
 
 	if (!(chip->wa_flags & SMBCHG_RESTART_WA))
 		return;
