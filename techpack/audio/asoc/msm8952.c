@@ -3454,17 +3454,20 @@ static int msm8952_asoc_machine_probe(struct platform_device *pdev)
 	const char *ext_pa = "qcom,msm-ext-pa";
 	const char *mclk = "qcom,msm-mclk-freq";
 //	const char *wsa = "asoc-wsa-codec-names";
-//	const char *wsa_prefix = "asoc-wsa-codec-prefixes";
 	const char *type = NULL;
 	const char *ext_pa_str = NULL;
-//	const char *wsa_str = NULL;
-//	const char *wsa_prefix_str = NULL;
 	const char *spk_ext_pa = "qcom,msm-spk-ext-pa";
 	int num_strings;
 	int id, i, val;
 	int ret = 0;
 	struct resource *muxsel;
-	//	char *temp_str = NULL;
+        const struct of_device_id *match;
+#if IS_ENABLED(CONFIG_SND_SOC_WSA881X_ANALOG)
+//	const char *wsa_prefix = "asoc-wsa-codec-prefixes";
+//	const char *wsa_str = NULL;
+//	const char *wsa_prefix_str = NULL;
+//	char *temp_str = NULL;
+#endif
 
 	pdata = devm_kzalloc(&pdev->dev,
 				sizeof(struct msm_asoc_mach_data),
