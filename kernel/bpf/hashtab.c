@@ -961,8 +961,6 @@ static int htab_lru_map_delete_elem(struct bpf_map *map, void *key)
 
 
 static void delete_all_elements(struct bpf_htab *htab)
-{
-	int i;
 
 	for (i = 0; i < htab->n_buckets; i++) {
 		struct hlist_nulls_head *head = select_bucket(htab, i);
@@ -976,6 +974,7 @@ static void delete_all_elements(struct bpf_htab *htab)
 		}
 	}
 }
+
 /* Called when map->refcnt goes to zero, either from workqueue or from syscall */
 static void htab_map_free(struct bpf_map *map)
 {
