@@ -958,13 +958,18 @@ static int htab_lru_map_delete_elem(struct bpf_map *map, void *key)
 	unsigned long flags;
 	u32 hash, key_size;
 	int ret = -ENOENT;
+
 	WARN_ON_ONCE(!rcu_read_lock_held());
 	key_size = map->key_size;
+
 	hash = htab_map_hash(key, key_size);
 	b = __select_bucket(htab, hash);
 	head = &b->head;
+
 	raw_spin_lock_irqsave(&b->lock, flags);
+
 	l = lookup_elem_raw(head, hash, key, key_size);
+
 	if (l) {
 		hlist_nulls_del_rcu(&l->hash_node);
 		ret = 0;
@@ -974,8 +979,12 @@ static int htab_lru_map_delete_elem(struct bpf_map *map, void *key)
 		bpf_lru_push_free(&htab->lru, &l->lru_node);
 	return ret;
 
+}
+
 
 static void delete_all_elements(struct bpf_htab *htab)
+{
+	int i;
 
 	for (i = 0; i < htab->n_buckets; i++) {
 		struct hlist_nulls_head *head = select_bucket(htab, i);
@@ -984,8 +993,7 @@ static void delete_all_elements(struct bpf_htab *htab)
 
 		hlist_nulls_for_each_entry_safe(l, n, head, hash_node) {
 			hlist_nulls_del_rcu(&l->hash_node);
-			if (l->state != HTAB_EXTRA_ELEM_USED)
-				htab_elem_free(htab, l);
+			htab_elem_free(htab, l);
 		}
 	}
 }
