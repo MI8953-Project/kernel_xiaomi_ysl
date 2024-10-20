@@ -100,6 +100,7 @@ enum bpf_prog_type {
 	BPF_PROG_TYPE_PERF_EVENT,
 	BPF_PROG_TYPE_CGROUP_SKB,
 	BPF_MAP_TYPE_LRU_HASH,
+	BPF_MAP_TYPE_LRU_PERCPU_HASH,
 };
 
 enum bpf_attach_type {
